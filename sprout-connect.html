@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sprout Connect</title>
+<style>
+  :root{
+    --soil:#5b3a29; --soil-dark:#3f2717; --leaf:#4c8c4a; --leaf-light:#8fce7f;
+    --sun:#ffd166; --card:#fbf3e3; --kiwi:#8bc34a;
+    --tile-font-size:26px; --ui-font-size:14px; --ui-font-size-lg:16px; --btn-pad:7px 12px;
+  }
+  body.large-mode{ --tile-font-size:38px; --ui-font-size:19px; --ui-font-size-lg:22px; --btn-pad:12px 18px; }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; min-height:100%; font-family:'Segoe UI', Tahoma, sans-serif;
+    background:linear-gradient(180deg,#bfe9ff 0%, #d9f4c8 45%, #c8a06b 100%);
+  }
+  #pageWrap{ display:flex; justify-content:center; gap:14px; padding:14px; align-items:flex-start; }
+  .sideAd{
+    width:170px; flex:0 0 170px; display:none;
+    background:linear-gradient(160deg,#eafbe0,#cfeec2);
+    border:2px dashed var(--kiwi); border-radius:14px; padding:12px;
+    text-align:center; font-size:calc(var(--ui-font-size) - 1px); color:var(--soil-dark);
+  }
+  .sideAd.show{ display:block; }
+  .sideAd img.adThumb{ font-size:34px; display:block; margin-bottom:6px; }
+  .sideAd h3{ margin:4px 0; font-size:calc(var(--ui-font-size) + 1px); color:#2e5c1f; }
+  .sideAd p{ margin:0 0 8px; line-height:1.35; }
+  .sideAd a.adLink{
+    display:inline-block; background:var(--kiwi); color:#fff; text-decoration:none;
+    padding:6px 10px; border-radius:8px; font-weight:700; font-size:calc(var(--ui-font-size) - 1px);
+  }
+  .sideAd .tag{ font-size:10px; opacity:0.6; margin-top:8px; }
+  #app{ width:100%; max-width:780px; }
+  h1{ text-align:center; margin:4px 0 2px; color:var(--soil-dark); font-size:calc(22px + (var(--ui-font-size) - 14px)); text-shadow:0 1px 0 #fff; }
+  h1 span{color:var(--leaf);}
+  .subtitle{ text-align:center; color:#5b3a29; font-size:var(--ui-font-size); margin-bottom:10px; }
+  #topBar{ display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+  #topBar .group{ display:flex; gap:6px; flex-wrap:wrap; }
+  #hud{
+    display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center;
+    background:rgba(255,255,255,0.55); border:2px solid var(--leaf); border-radius:14px;
+    padding:8px 14px; margin-bottom:10px; font-weight:600; color:var(--soil-dark); font-size:var(--ui-font-size);
+  }
+  #hud .stat{display:flex; gap:6px; align-items:center;}
+  #hud .stat b{font-size:calc(var(--ui-font-size) + 2px);}
+  .btn{ background:var(--leaf); color:#fff; border:none; border-radius:10px; padding:var(--btn-pad); font-weight:700; cursor:pointer; font-size:var(--ui-font-size); box-shadow:0 3px 0 #336b32; }
+  .btn:active{transform:translateY(2px); box-shadow:0 1px 0 #336b32;}
+  .btn:disabled{ opacity:0.5; cursor:not-allowed; }
+  .btn.alt{background:var(--sun); color:#5b3a00; box-shadow:0 3px 0 #c99a2e;}
+  .btn.ghost{background:#fff; color:var(--soil-dark); border:2px solid var(--leaf); box-shadow:none;}
+  .btn.gold{ background:linear-gradient(160deg,#ffe08a,#ffc94d); color:#5b3a00; box-shadow:0 3px 0 #c99a2e; }
+  #boardWrap{
+    position:relative;
+    background:radial-gradient(ellipse at top, #a9dcf5 0%, transparent 60%), linear-gradient(180deg,#e9dcc0 0%, #d8bd8c 100%);
+    border:3px solid var(--soil); border-radius:16px; padding:10px; box-shadow: inset 0 0 20px rgba(0,0,0,0.15);
+  }
+  #board{ display:grid; gap:4px; position:relative; z-index:2; }
+  .tile{
+    background:linear-gradient(160deg, var(--card), #eddfc0); border:2px solid #c9a066; border-radius:10px;
+    display:flex; align-items:center; justify-content:center; font-size:var(--tile-font-size); aspect-ratio:1;
+    cursor:pointer; user-select:none; transition:transform .12s ease, box-shadow .12s ease, opacity .25s ease; box-shadow:0 3px 0 #b8935c;
+  }
+  .tile:hover{transform:translateY(-2px); box-shadow:0 5px 0 #b8935c;}
+  .tile.selected{ border-color:var(--sun); box-shadow:0 0 0 3px var(--sun), 0 3px 0 #b8935c; transform:translateY(-2px); }
+  .tile.empty{visibility:hidden; cursor:default; box-shadow:none;}
+  .tile.cleared{ opacity:0; transform:scale(0.3) rotate(15deg); pointer-events:none; }
+  .tile.shake{animation:shake .3s;}
+  @keyframes shake{ 0%,100%{transform:translateX(0);} 25%{transform:translateX(-4px);} 75%{transform:translateX(4px);} }
+  svg.pathLayer{ position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:5; }
+  svg.pathLayer polyline{ fill:none; stroke:#ff8a3d; stroke-width:4; stroke-linecap:round; stroke-linejoin:round; opacity:0; animation:pathFade .5s ease forwards; }
+  @keyframes pathFade{ 0%{opacity:0;} 20%{opacity:1;} 80%{opacity:1;} 100%{opacity:0;} }
+  #overlay, #modalLayer, #interstitial{
+    position:fixed; inset:0; background:rgba(30,20,10,0.7);
+    display:none; align-items:center; justify-content:center; z-index:50; padding:14px;
+  }
+  .card{ background:var(--card); border-radius:18px; padding:24px 26px; text-align:center; border:3px solid var(--leaf); max-width:380px; width:100%; font-size:var(--ui-font-size); }
+  .card h2{ margin:0 0 8px; color:var(--soil-dark); }
+  .card p{ color:#5b3a29; margin:0 0 14px; }
+  .card input{ width:100%; padding:10px; margin:6px 0; border-radius:8px; border:2px solid #c9a066; font-size:var(--ui-font-size); }
+  .card .error{ color:#b3261e; font-size:var(--ui-font-size); margin:4px 0; min-height:18px; }
+  .card .switchLink{ color:var(--leaf); cursor:pointer; text-decoration:underline; font-size:var(--ui-font-size); display:block; margin-top:8px; }
+  #leaderList{ list-style:none; padding:0; margin:0; text-align:left; max-height:340px; overflow-y:auto; }
+  #leaderList li{ display:flex; justify-content:space-between; padding:7px 10px; border-radius:8px; font-size:var(--ui-font-size); }
+  #leaderList li:nth-child(odd){ background:rgba(140,110,60,0.1); }
+  #toast{
+    position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:var(--leaf); color:#fff;
+    padding:10px 18px; border-radius:10px; font-size:var(--ui-font-size); opacity:0; pointer-events:none; transition:opacity .3s; z-index:60;
+  }
+  #toast.show{ opacity:1; }
+  .footer-note{ text-align:center; font-size:calc(var(--ui-font-size) - 2px); color:#4a3320; margin-top:8px; opacity:0.8; }
+
+  .adCardInner{ background:linear-gradient(160deg,#eafbe0,#cfeec2); border:2px dashed var(--kiwi); border-radius:14px; padding:16px; margin-bottom:14px; }
+  .adCardInner .adThumb{ font-size:44px; }
+  .adCardInner h3{ margin:6px 0 2px; color:#2e5c1f; }
+  .adCardInner p{ color:var(--soil-dark); margin:0 0 10px; }
+  #interstitialCountdown{ font-size:calc(var(--ui-font-size) + 4px); font-weight:800; color:#b3261e; margin-bottom:10px; }
+
+  @media (min-width: 1140px){ .sideAd.show{ display:block; } }
+</style>
+</head>
+<body>
+<div id="pageWrap">
+  <aside class="sideAd" id="sideAdLeft"></aside>
+
+  <div id="app">
+    <h1>🌱 <span id="titleMain">Sprout Connect</span></h1>
+    <div class="subtitle" id="subtitleText">garden mahjong</div>
+
+    <div id="topBar">
+      <div class="group">
+        <button class="btn ghost" id="largeModeBtn">🔍 Large Mode</button>
+        <button class="btn ghost" id="langBtn">RU</button>
+      </div>
+      <div class="group">
+        <span id="authStatus" class="btn ghost" style="cursor:default;"></span>
+        <button class="btn alt" id="leaderboardBtn">🏆</button>
+        <button class="btn gold" id="removeAdsBtn">✨ Remove Ads – £0.49</button>
+        <button class="btn" id="authBtn">Log in</button>
+      </div>
+    </div>
+
+    <div id="hud">
+      <div class="stat" id="levelStat">Level <b id="levelVal">1</b></div>
+      <div class="stat" id="scoreStat">Score <b id="scoreVal">0</b></div>
+      <div class="stat" id="timeStat">Time <b id="timeVal">100</b>s</div>
+      <button class="btn alt" id="shuffleBtn">🔀 Shuffle</button>
+      <button class="btn" id="restartBtn">↺ Restart</button>
+    </div>
+
+    <div id="boardWrap"><div id="board"></div></div>
+    <div class="footer-note" id="footerNote">Match two identical tiles. The path between them can bend at most twice.</div>
+  </div>
+
+  <aside class="sideAd" id="sideAdRight"></aside>
+</div>
+
+<div id="overlay">
+  <div class="card">
+    <h2 id="overlayTitle">You win!</h2>
+    <p id="overlayText">Garden cleared.</p>
+    <div id="overlaySaveNotice" style="font-size:calc(var(--ui-font-size) - 1px); color:#4a6b2a; margin-bottom:10px;"></div>
+    <button class="btn" id="overlayBtn">Continue</button>
+  </div>
+</div>
+
+<div id="interstitial">
+  <div class="card">
+    <div class="adCardInner" id="interstitialAd"></div>
+    <div id="interstitialCountdown">10</div>
+    <button class="btn" id="interstitialContinueBtn" disabled>Continue</button>
+  </div>
+</div>
+
+<div id="modalLayer">
+  <div class="card" id="authCard">
+    <h2 id="authTitle">Log in</h2>
+    <p id="authGateNote" style="display:none; font-size:calc(var(--ui-font-size) - 1px);"></p>
+    <input type="text" id="authUsername" placeholder="Username" autocomplete="username">
+    <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password">
+    <div class="error" id="authError"></div>
+    <button class="btn" id="authSubmitBtn" style="width:100%;">Log in</button>
+    <span class="switchLink" id="authSwitchLink">Need an account? Register</span>
+    <button class="btn ghost" id="authCloseBtn" style="margin-top:12px;">Close</button>
+  </div>
+  <div class="card" id="leaderCard" style="display:none;">
+    <h2 id="leaderTitle">🏆 Top Gardeners</h2>
+    <ul id="leaderList"></ul>
+    <button class="btn ghost" id="leaderCloseBtn" style="margin-top:12px;">Close</button>
+  </div>
+  <div class="card" id="premiumCard" style="display:none;">
+    <h2 id="premiumTitle">Remove Ads</h2>
+    <p id="premiumText">Email us and we'll sort you out with an activation link.</p>
+    <p style="font-weight:700;" id="premiumEmailLine">supportkiwi@gmail.com</p>
+    <button class="btn gold" id="premiumEmailBtn" style="width:100%;">📧 Email support</button>
+    <button class="btn ghost" id="premiumCloseBtn" style="margin-top:12px;">Close</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<div id="adminGate" style="display:none;">
+  <div class="card" style="max-width:340px; margin:70px auto;">
+    <h2>🥝 Admin Access</h2>
+    <p style="font-size:calc(var(--ui-font-size) - 1px);">Enter your Worker's ADMIN_KEY.</p>
+    <input type="password" id="adminPasswordInput" placeholder="Admin password">
+    <div class="error" id="adminGateError"></div>
+    <button class="btn" id="adminGateSubmit" style="width:100%;">Enter</button>
+  </div>
+</div>
+
+<div id="adminPanel" style="display:none; max-width:960px; margin:20px auto; padding:0 14px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+    <h2 style="margin:0; color:var(--soil-dark); font-size:20px;">🥝 Admin Panel</h2>
+    <div style="display:flex; gap:8px;">
+      <input type="text" id="adminSearch" placeholder="Filter by username or ID..." style="padding:8px; border-radius:8px; border:2px solid #c9a066; font-size:var(--ui-font-size);">
+      <button class="btn ghost" id="adminLogoutBtn">Log out</button>
+    </div>
+  </div>
+  <div id="adminStatus" style="margin-bottom:10px; font-size:var(--ui-font-size); color:var(--soil-dark);"></div>
+  <div style="overflow-x:auto; border-radius:12px;">
+    <table id="adminTable" style="width:100%; border-collapse:collapse; background:rgba(255,255,255,0.7); font-size:var(--ui-font-size);">
+      <thead>
+        <tr style="background:var(--leaf); color:#fff;">
+          <th style="padding:8px 10px; text-align:left;">ID</th>
+          <th style="padding:8px 10px; text-align:left;">Username</th>
+          <th style="padding:8px 10px; text-align:left;">Signup IP</th>
+          <th style="padding:8px 10px; text-align:left;">Created</th>
+          <th style="padding:8px 10px; text-align:left;">Best score</th>
+          <th style="padding:8px 10px; text-align:left;">Status</th>
+          <th style="padding:8px 10px; text-align:left;">Action</th>
+        </tr>
+      </thead>
+      <tbody id="adminTbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ===== EDIT THESE AFTER PASTING =====
+  const CONFIG = {
+    API_BASE_URL: "https://sprout-connect-api.YOUR-SUBDOMAIN.workers.dev",
+    SUPPORT_EMAIL: "supportkiwi@gmail.com",
+    KIWIMONITOR_URL: "https://github.com/kiwios-uk/KiwiMonitor",
+    KIWIOS_URL: "https://kiwios-uk.github.io/"
+  };
+  // =====================================
+
+  const EMOJIS = ['🌻','🌼','🌷','🌹','🥀','🌾','🌿','🍄','🥕','🍅','🌽','🍓','🍇','🐝','🦋','🐌','💧','☀️','🪴','🌵'];
+  const BASE_TIME = 100;
+  const TIME_PER_LEVEL = 20;
+  const INTERSTITIAL_SECONDS = 10;
+
+  const ADS = {
+    en: [
+      { emoji:"🥝📊", name:"KiwiMonitor", desc:"A kiwi-themed hardware monitor for your PC — live CPU, GPU, RAM and fan stats.", url: CONFIG.KIWIMONITOR_URL },
+      { emoji:"🥝💻", name:"KiwiOS", desc:"The KiwiSystems desktop experience. Check it out.", url: CONFIG.KIWIOS_URL }
+    ],
+    ru: [
+      { emoji:"🥝📊", name:"KiwiMonitor", desc:"Мониторинг железа в киви-стиле — CPU, GPU, RAM и кулеры в реальном времени.", url: CONFIG.KIWIMONITOR_URL },
+      { emoji:"🥝💻", name:"KiwiOS", desc:"Рабочий стол от KiwiSystems. Загляните.", url: CONFIG.KIWIOS_URL }
+    ]
+  };
+
+  const I18N = {
+    en: {
+      title:"Sprout Connect", subtitle:"garden mahjong",
+      level:"Level", score:"Score", time:"Time",
+      shuffle:"🔀 Shuffle", restart:"↺ Restart", largeMode:"🔍 Large Mode", largeModeOn:"🔎 Large Mode: On",
+      footerNote:"Match two identical tiles. The path between them can bend at most twice.",
+      winTitle:"🌼 Garden cleared!", winText:(l,s)=>`Level ${l} complete. Score: ${s}`,
+      nextLevel:"Next level",
+      loseTitle:"⏱️ Time is up", loseText:(s)=>`Score: ${s}. Try again?`,
+      restartLevelBtn:"Restart level",
+      loginTitle:"Log in", registerTitle:"Create account",
+      usernamePh:"Username", passwordPh:"Password",
+      loginBtn:"Log in", registerBtn:"Create account",
+      needAccount:"Need an account? Register", haveAccount:"Already have an account? Log in",
+      close:"Close", logout:"Log out",
+      loggedInAs:(u)=>`👤 ${u}`, premiumBadge:"✨ Premium",
+      leaderboardTitle:"🏆 Top Gardeners",
+      scoreSaved:"Score saved to leaderboard!",
+      guestNotice:"Log in to save your score to the leaderboard.",
+      genericError:"Something went wrong. Check the API URL / your connection.",
+      removeAdsBtn:"✨ Remove Ads – £0.49",
+      premiumTitle:"Remove Ads — £0.49",
+      premiumTextLoggedIn:(u)=>`Email us at the address below with your username (${u}) and we'll send you an activation link once it's sorted — no ads, forever.`,
+      premiumTextLoggedOut:"Log in first so we know which account to activate, then come back here.",
+      emailBtn:"📧 Email support",
+      continueBtn:"Continue",
+      continueIn:(n)=>`Continue in ${n}s`,
+      sponsoredTag:"from the KiwiSystems family 🥝",
+      alsoFrom:"🥝 Also from KiwiSystems",
+      gateNote:"Create a free account to start planting. Your account ID is shown after signup — you can give it to support for a free premium grant.",
+      yourIdToast:(id)=>`Account created! Your ID is ${id} — worth saving.`,
+      sessionExpired:"Your session expired — please log in again.",
+    },
+    ru: {
+      title:"Sprout Connect", subtitle:"садовый маджонг",
+      level:"Уровень", score:"Очки", time:"Время",
+      shuffle:"🔀 Перемешать", restart:"↺ Заново", largeMode:"🔍 Крупный режим", largeModeOn:"🔎 Крупный режим: Вкл",
+      footerNote:"Соедините две одинаковые плитки. Путь между ними может иметь не более двух изгибов.",
+      winTitle:"🌼 Сад расчищен!", winText:(l,s)=>`Уровень ${l} пройден. Очки: ${s}`,
+      nextLevel:"Следующий уровень",
+      loseTitle:"⏱️ Время вышло", loseText:(s)=>`Очки: ${s}. Попробовать снова?`,
+      restartLevelBtn:"Начать уровень заново",
+      loginTitle:"Вход", registerTitle:"Регистрация",
+      usernamePh:"Имя пользователя", passwordPh:"Пароль",
+      loginBtn:"Войти", registerBtn:"Создать аккаунт",
+      needAccount:"Нет аккаунта? Зарегистрироваться", haveAccount:"Уже есть аккаунт? Войти",
+      close:"Закрыть", logout:"Выйти",
+      loggedInAs:(u)=>`👤 ${u}`, premiumBadge:"✨ Премиум",
+      leaderboardTitle:"🏆 Лучшие садоводы",
+      scoreSaved:"Результат сохранён в таблице лидеров!",
+      guestNotice:"Войдите, чтобы сохранить результат в таблице лидеров.",
+      genericError:"Что-то пошло не так. Проверьте URL API и соединение.",
+      removeAdsBtn:"✨ Убрать рекламу – £0.49",
+      premiumTitle:"Убрать рекламу — £0.49",
+      premiumTextLoggedIn:(u)=>`Напишите нам на почту, указав ваш логин (${u}), и после подтверждения оплаты мы пришлём ссылку активации — реклама пропадёт навсегда.`,
+      premiumTextLoggedOut:"Сначала войдите в аккаунт, чтобы мы знали, кому активировать премиум.",
+      emailBtn:"📧 Написать в поддержку",
+      continueBtn:"Продолжить",
+      continueIn:(n)=>`Продолжить через ${n}с`,
+      sponsoredTag:"от семьи KiwiSystems 🥝",
+      alsoFrom:"🥝 Также от KiwiSystems",
+      gateNote:"Создайте бесплатный аккаунт, чтобы начать игру. После регистрации вы получите ID аккаунта — его можно дать поддержке для бесплатного премиума.",
+      yourIdToast:(id)=>`Аккаунт создан! Ваш ID: ${id} — сохраните его.`,
+      sessionExpired:"Сессия истекла — войдите снова.",
+    }
+  };
+
+  const state = {
+    lang: localStorage.getItem('sc_lang') || 'en',
+    level: 1, score: 0,
+    rows: 6, cols: 8,
+    board: [], selected: null,
+    timer: BASE_TIME, timerId: null,
+    busy: false,
+    authMode: 'login',
+    token: localStorage.getItem('sc_token') || null,
+    username: localStorage.getItem('sc_username') || null,
+    userId: localStorage.getItem('sc_userid') || null,
+    isPremium: localStorage.getItem('sc_premium') === '1',
+    interstitialTimerId: null,
+    gameStarted: false,
+  };
+
+  function t(){ return I18N[state.lang]; }
+  const el = (id) => document.getElementById(id);
+  const boardEl = el('board'), boardWrap = el('boardWrap');
+  const levelVal = el('levelVal'), scoreVal = el('scoreVal'), timeVal = el('timeVal');
+  const overlay = el('overlay'), overlayTitle = el('overlayTitle'), overlayText = el('overlayText');
+  const overlayBtn = el('overlayBtn'), overlaySaveNotice = el('overlaySaveNotice');
+  const modalLayer = el('modalLayer'), authCard = el('authCard'), leaderCard = el('leaderCard'), premiumCard = el('premiumCard');
+  const interstitial = el('interstitial');
+
+  function shuffleArr(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+  function showToast(msg){ const toast=el('toast'); toast.textContent=msg; toast.classList.add('show'); setTimeout(()=>toast.classList.remove('show'),2400); }
+
+  // ---------- ads ----------
+  function adCardHtml(ad, T){
+    return `<div class="adThumb">${ad.emoji}</div><h3>${ad.name}</h3><p>${ad.desc}</p>
+      <a class="adLink" href="${ad.url}" target="_blank" rel="noopener">${T.alsoFrom.replace('🥝 ','')} →</a>
+      <div class="tag">${T.sponsoredTag}</div>`;
+  }
+  function renderSideAds(){
+    const T = t();
+    const list = ADS[state.lang];
+    const showAds = !state.isPremium;
+    const left = el('sideAdLeft'), right = el('sideAdRight');
+    left.classList.toggle('show', showAds);
+    right.classList.toggle('show', showAds);
+    if(showAds){
+      left.innerHTML = adCardHtml(list[0], T);
+      right.innerHTML = adCardHtml(list[1], T);
+    }
+  }
+
+  function runInterstitial(onDone){
+    if(state.isPremium){ onDone(); return; }
+    const T = t();
+    const list = ADS[state.lang];
+    const ad = list[Math.floor(Math.random()*list.length)];
+    el('interstitialAd').innerHTML = adCardHtml(ad, T);
+    let remaining = INTERSTITIAL_SECONDS;
+    const countdownEl = el('interstitialCountdown');
+    const btn = el('interstitialContinueBtn');
+    countdownEl.textContent = T.continueIn(remaining);
+    btn.textContent = T.continueIn(remaining);
+    btn.disabled = true;
+    interstitial.style.display = 'flex';
+    clearInterval(state.interstitialTimerId);
+    state.interstitialTimerId = setInterval(()=>{
+      remaining--;
+      if(remaining > 0){
+        countdownEl.textContent = T.continueIn(remaining);
+        btn.textContent = T.continueIn(remaining);
+      } else {
+        clearInterval(state.interstitialTimerId);
+        countdownEl.textContent = '';
+        btn.disabled = false;
+        btn.textContent = T.continueBtn;
+      }
+    }, 1000);
+    btn.onclick = ()=>{
+      if(btn.disabled) return;
+      interstitial.style.display = 'none';
+      onDone();
+    };
+  }
+
+  // ---------- i18n / accessibility rendering ----------
+  function applyStaticText(){
+    const T = t();
+    document.documentElement.lang = state.lang;
+    el('titleMain').textContent = T.title;
+    el('subtitleText').textContent = T.subtitle;
+    el('levelStat').childNodes[0].textContent = T.level + ' ';
+    el('scoreStat').childNodes[0].textContent = T.score + ' ';
+    el('timeStat').childNodes[0].textContent = T.time + ' ';
+    el('shuffleBtn').textContent = T.shuffle;
+    el('restartBtn').textContent = T.restart;
+    el('footerNote').textContent = T.footerNote;
+    el('largeModeBtn').textContent = document.body.classList.contains('large-mode') ? T.largeModeOn : T.largeMode;
+    el('langBtn').textContent = state.lang === 'en' ? 'RU' : 'EN';
+    el('removeAdsBtn').textContent = T.removeAdsBtn;
+    el('removeAdsBtn').style.display = state.isPremium ? 'none' : 'inline-block';
+    updateAuthUI();
+    renderSideAds();
+  }
+
+  function updateAuthUI(){
+    const T = t();
+    if(state.token && state.username){
+      const idTag = state.userId ? ` (ID ${state.userId})` : '';
+      el('authStatus').textContent = (state.isPremium ? T.premiumBadge + ' · ' : '') + T.loggedInAs(state.username) + idTag;
+      el('authBtn').textContent = T.logout;
+      el('authBtn').onclick = doLogout;
+    } else {
+      el('authStatus').textContent = '';
+      el('authBtn').textContent = T.loginBtn;
+      el('authBtn').onclick = ()=> openAuthModal(true);
+    }
+  }
+
+  // ---------- accessibility toggle ----------
+  el('largeModeBtn').addEventListener('click', ()=>{
+    document.body.classList.toggle('large-mode');
+    localStorage.setItem('sc_large', document.body.classList.contains('large-mode') ? '1' : '0');
+    applyStaticText();
+  });
+  if(localStorage.getItem('sc_large') === '1') document.body.classList.add('large-mode');
+
+  // ---------- language toggle ----------
+  el('langBtn').addEventListener('click', ()=>{
+    state.lang = state.lang === 'en' ? 'ru' : 'en';
+    localStorage.setItem('sc_lang', state.lang);
+    applyStaticText();
+  });
+
+  // ---------- level building ----------
+  function buildLevel(level){
+    const rows = Math.min(10, 6 + (level - 1));
+    const cols = 8;
+    state.rows = rows; state.cols = cols;
+    const tileCount = rows * cols;
+    const pairsNeeded = tileCount / 2;
+    const numSymbols = Math.min(EMOJIS.length, 6 + level);
+    const pool = [];
+    for(let i=0;i<pairsNeeded;i++){ const s = EMOJIS[i % numSymbols]; pool.push(s, s); }
+    shuffleArr(pool);
+    const board = [];
+    for(let r=0;r<=rows+1;r++) board.push(new Array(cols+2).fill(undefined));
+    let idx=0;
+    for(let r=1;r<=rows;r++) for(let c=1;c<=cols;c++) board[r][c] = pool[idx++];
+    state.board = board;
+  }
+
+  function freeAt(r,c,p1,p2){
+    if((r===p1.r && c===p1.c) || (r===p2.r && c===p2.c)) return true;
+    if(r<1 || r>state.rows || c<1 || c>state.cols) return true;
+    return state.board[r][c] === null;
+  }
+  function straightClear(r1,c1,r2,c2,p1,p2){
+    if(r1===r2){ const lo=Math.min(c1,c2),hi=Math.max(c1,c2); for(let c=lo+1;c<hi;c++) if(!freeAt(r1,c,p1,p2)) return false; return true; }
+    if(c1===c2){ const lo=Math.min(r1,r2),hi=Math.max(r1,r2); for(let r=lo+1;r<hi;r++) if(!freeAt(r,c1,p1,p2)) return false; return true; }
+    return false;
+  }
+  function findPath(p1,p2){
+    if(straightClear(p1.r,p1.c,p2.r,p2.c,p1,p2)) return [p1,p2];
+    const corners=[{r:p1.r,c:p2.c},{r:p2.r,c:p1.c}];
+    for(const cp of corners){
+      if(freeAt(cp.r,cp.c,p1,p2) && straightClear(p1.r,p1.c,cp.r,cp.c,p1,p2) && straightClear(cp.r,cp.c,p2.r,p2.c,p1,p2)) return [p1,cp,p2];
+    }
+    for(let r=0;r<=state.rows+1;r++){
+      const a={r:r,c:p1.c}, b={r:r,c:p2.c};
+      if(freeAt(a.r,a.c,p1,p2) && freeAt(b.r,b.c,p1,p2) &&
+         straightClear(p1.r,p1.c,r,p1.c,p1,p2) && straightClear(r,p1.c,r,p2.c,p1,p2) && straightClear(r,p2.c,p2.r,p2.c,p1,p2)) return [p1,a,b,p2];
+    }
+    for(let c=0;c<=state.cols+1;c++){
+      const a={r:p1.r,c:c}, b={r:p2.r,c:c};
+      if(freeAt(a.r,a.c,p1,p2) && freeAt(b.r,b.c,p1,p2) &&
+         straightClear(p1.r,p1.c,p1.r,c,p1,p2) && straightClear(p1.r,c,p2.r,c,p1,p2) && straightClear(p2.r,c,p2.r,p2.c,p1,p2)) return [p1,a,b,p2];
+    }
+    return null;
+  }
+  function hasAnyMove(){
+    const positions=[];
+    for(let r=1;r<=state.rows;r++) for(let c=1;c<=state.cols;c++) if(state.board[r][c]) positions.push({r,c});
+    for(let i=0;i<positions.length;i++) for(let j=i+1;j<positions.length;j++){
+      const p1=positions[i], p2=positions[j];
+      if(state.board[p1.r][p1.c]===state.board[p2.r][p2.c] && findPath(p1,p2)) return true;
+    }
+    return false;
+  }
+  function boardIsClear(){
+    for(let r=1;r<=state.rows;r++) for(let c=1;c<=state.cols;c++) if(state.board[r][c]) return false;
+    return true;
+  }
+
+  function render(){
+    boardEl.innerHTML='';
+    boardEl.style.gridTemplateColumns = `repeat(${state.cols}, 1fr)`;
+    for(let r=1;r<=state.rows;r++) for(let c=1;c<=state.cols;c++){
+      const sym = state.board[r][c];
+      const div = document.createElement('div');
+      div.className = 'tile' + (sym ? '' : ' empty');
+      div.dataset.r=r; div.dataset.c=c;
+      div.textContent = sym || '';
+      div.addEventListener('click', onTileClick);
+      boardEl.appendChild(div);
+    }
+    const old = boardWrap.querySelector('svg.pathLayer');
+    if(old) old.remove();
+    const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('class','pathLayer');
+    boardWrap.appendChild(svg);
+  }
+
+  function pixelFor(r,c){
+    const rect = boardEl.getBoundingClientRect();
+    const wrapRect = boardWrap.getBoundingClientRect();
+    const tileW = rect.width/state.cols, tileH = rect.height/state.rows;
+    const offsetX = rect.left - wrapRect.left, offsetY = rect.top - wrapRect.top;
+    return { x: offsetX + (c-0.5)*tileW, y: offsetY + (r-0.5)*tileH };
+  }
+  function drawPath(path){
+    const old = boardWrap.querySelector('svg.pathLayer');
+    if(old) old.remove();
+    const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('class','pathLayer');
+    const pts = path.map(p=>{ const px=pixelFor(p.r,p.c); return `${px.x},${px.y}`; }).join(' ');
+    const poly = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+    poly.setAttribute('points', pts);
+    svg.appendChild(poly);
+    boardWrap.appendChild(svg);
+  }
+  function tileEl(r,c){ return boardEl.querySelector(`.tile[data-r="${r}"][data-c="${c}"]`); }
+
+  function onTileClick(e){
+    if(state.busy) return;
+    const r=parseInt(e.currentTarget.dataset.r), c=parseInt(e.currentTarget.dataset.c);
+    if(!state.board[r][c]) return;
+    if(!state.selected){ state.selected={r,c}; e.currentTarget.classList.add('selected'); return; }
+    if(state.selected.r===r && state.selected.c===c){ e.currentTarget.classList.remove('selected'); state.selected=null; return; }
+    const p1=state.selected, p2={r,c};
+    const sym1=state.board[p1.r][p1.c], sym2=state.board[p2.r][p2.c];
+    if(sym1===sym2){
+      const path = findPath(p1,p2);
+      if(path){
+        state.busy=true;
+        drawPath(path);
+        tileEl(p1.r,p1.c).classList.remove('selected');
+        state.score += 10; scoreVal.textContent = state.score;
+        setTimeout(()=>{
+          state.board[p1.r][p1.c]=null; state.board[p2.r][p2.c]=null;
+          tileEl(p1.r,p1.c).classList.add('cleared'); tileEl(p2.r,p2.c).classList.add('cleared');
+          state.selected=null; state.busy=false;
+          if(boardIsClear()){ clearInterval(state.timerId); showOverlay(true); }
+          else if(!hasAnyMove()){ setTimeout(reshuffleRemaining, 400); }
+        }, 260);
+        return;
+      }
+    }
+    const elc = e.currentTarget;
+    elc.classList.add('shake'); setTimeout(()=>elc.classList.remove('shake'), 300);
+    tileEl(p1.r,p1.c).classList.remove('selected');
+    state.selected={r,c}; elc.classList.add('selected');
+  }
+
+  function reshuffleRemaining(){
+    const remaining=[];
+    for(let r=1;r<=state.rows;r++) for(let c=1;c<=state.cols;c++) if(state.board[r][c]) remaining.push({r,c,sym:state.board[r][c]});
+    const syms = shuffleArr(remaining.map(x=>x.sym));
+    remaining.forEach((pos,i)=>{ state.board[pos.r][pos.c]=syms[i]; });
+    render();
+  }
+
+  function timerForLevel(level){ return BASE_TIME + (level-1)*TIME_PER_LEVEL; }
+
+  function startTimer(){
+    clearInterval(state.timerId);
+    state.timerId = setInterval(()=>{
+      state.timer--; timeVal.textContent = state.timer;
+      if(state.timer<=0){ clearInterval(state.timerId); showOverlay(false); }
+    }, 1000);
+  }
+
+  async function submitScoreIfLoggedIn(){
+    if(!state.token) return false;
+    try{
+      const res = await fetch(`${CONFIG.API_BASE_URL}/api/score`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ token: state.token, score: state.score, level: state.level })
+      });
+      return res.ok;
+    }catch(err){ return false; }
+  }
+
+  async function showOverlay(won){
+    const T = t();
+    const doShow = async ()=>{
+      overlay.style.display='flex';
+      overlaySaveNotice.textContent = '';
+      if(won){
+        overlayTitle.textContent = T.winTitle;
+        overlayText.textContent = T.winText(state.level, state.score);
+        overlayBtn.textContent = T.nextLevel;
+        overlayBtn.onclick = ()=>{
+          overlay.style.display='none';
+          state.level++; levelVal.textContent = state.level;
+          state.timer = timerForLevel(state.level); timeVal.textContent = state.timer;
+          buildLevel(state.level); render(); startTimer();
+        };
+      } else {
+        overlayTitle.textContent = T.loseTitle;
+        overlayText.textContent = T.loseText(state.score);
+        overlayBtn.textContent = T.restartLevelBtn;
+        overlayBtn.onclick = ()=>{ overlay.style.display='none'; restartLevel(); };
+      }
+      if(state.token){
+        const ok = await submitScoreIfLoggedIn();
+        overlaySaveNotice.textContent = ok ? T.scoreSaved : '';
+      } else {
+        overlaySaveNotice.textContent = T.guestNotice;
+      }
+    };
+    if(won){ doShow(); }
+    else { runInterstitial(doShow); } // ads only forced on loss, per spec
+  }
+
+  function restartLevel(){
+    state.timer = timerForLevel(state.level); timeVal.textContent = state.timer;
+    buildLevel(state.level); render(); startTimer();
+  }
+
+  el('shuffleBtn').addEventListener('click', ()=>{ if(!state.busy) reshuffleRemaining(); });
+  el('restartBtn').addEventListener('click', ()=>{
+    state.level=1; state.score=0; scoreVal.textContent=0; levelVal.textContent=1;
+    restartLevel();
+  });
+
+  // ---------- Auth modal ----------
+  // "forced" mode = no account yet, game hidden until they sign up/log in; close button hidden.
+  function openAuthModal(forced){
+    state.authMode = forced ? 'register' : 'login';
+    state.authForced = !!forced;
+    renderAuthCard();
+    authCard.style.display='block'; leaderCard.style.display='none'; premiumCard.style.display='none';
+    modalLayer.style.display='flex';
+  }
+  function renderAuthCard(){
+    const T = t();
+    el('authTitle').textContent = state.authMode==='login' ? T.loginTitle : T.registerTitle;
+    el('authUsername').placeholder = T.usernamePh;
+    el('authPassword').placeholder = T.passwordPh;
+    el('authSubmitBtn').textContent = state.authMode==='login' ? T.loginBtn : T.registerBtn;
+    el('authSwitchLink').textContent = state.authMode==='login' ? T.needAccount : T.haveAccount;
+    el('authError').textContent='';
+    const gateNote = el('authGateNote');
+    if(state.authForced){
+      gateNote.style.display='block';
+      gateNote.textContent = T.gateNote;
+      el('authCloseBtn').style.display='none';
+    } else {
+      gateNote.style.display='none';
+      el('authCloseBtn').style.display='inline-block';
+    }
+  }
+  el('authSwitchLink').addEventListener('click', ()=>{ state.authMode = state.authMode==='login' ? 'register' : 'login'; renderAuthCard(); });
+  el('authCloseBtn').addEventListener('click', ()=>{ if(!state.authForced) modalLayer.style.display='none'; });
+  el('authSubmitBtn').addEventListener('click', async ()=>{
+    const T = t();
+    const username = el('authUsername').value.trim();
+    const password = el('authPassword').value;
+    const endpoint = state.authMode==='login' ? '/api/login' : '/api/register';
+    try{
+      const res = await fetch(`${CONFIG.API_BASE_URL}${endpoint}`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if(!res.ok){ el('authError').textContent = data.error || T.genericError; return; }
+      const wasNewAccount = state.authMode === 'register';
+      state.token = data.token; state.username = data.username; state.userId = data.user_id;
+      state.isPremium = !!data.is_premium;
+      localStorage.setItem('sc_token', state.token);
+      localStorage.setItem('sc_username', state.username);
+      localStorage.setItem('sc_userid', state.userId);
+      localStorage.setItem('sc_premium', state.isPremium ? '1' : '0');
+      modalLayer.style.display='none';
+      state.authForced = false;
+      applyStaticText();
+      if(!state.gameStarted) startGame();
+      if(wasNewAccount) showToast(T.yourIdToast(state.userId));
+    }catch(err){ el('authError').textContent = T.genericError; }
+  });
+
+  async function doLogout(){
+    if(state.token){
+      try{ await fetch(`${CONFIG.API_BASE_URL}/api/logout`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({token: state.token}) }); }catch(e){}
+    }
+    state.token=null; state.username=null; state.userId=null; state.isPremium=false;
+    localStorage.removeItem('sc_token'); localStorage.removeItem('sc_username');
+    localStorage.removeItem('sc_userid'); localStorage.removeItem('sc_premium');
+    applyStaticText();
+    lockGame();
+    openAuthModal(true);
+  }
+
+  async function refreshPremiumStatus(){
+    if(!state.token) return true;
+    try{
+      const res = await fetch(`${CONFIG.API_BASE_URL}/api/me?token=${encodeURIComponent(state.token)}`);
+      if(!res.ok){
+        // expired/invalid session — force them to log in again
+        state.token=null; state.username=null; state.userId=null; state.isPremium=false;
+        localStorage.removeItem('sc_token'); localStorage.removeItem('sc_username');
+        localStorage.removeItem('sc_userid'); localStorage.removeItem('sc_premium');
+        return false;
+      }
+      const data = await res.json();
+      state.isPremium = !!data.is_premium;
+      state.userId = data.user_id;
+      localStorage.setItem('sc_premium', state.isPremium ? '1' : '0');
+      localStorage.setItem('sc_userid', state.userId);
+      applyStaticText();
+      return true;
+    }catch(err){ return true; } // network hiccup — don't lock them out
+  }
+
+  // ---------- Leaderboard modal ----------
+  el('leaderboardBtn').addEventListener('click', async ()=>{
+    const T = t();
+    el('leaderTitle').textContent = T.leaderboardTitle;
+    el('leaderCloseBtn').textContent = T.close;
+    leaderCard.style.display='block'; authCard.style.display='none'; premiumCard.style.display='none';
+    modalLayer.style.display='flex';
+    const list = el('leaderList');
+    list.innerHTML = '<li>...</li>';
+    try{
+      const res = await fetch(`${CONFIG.API_BASE_URL}/api/leaderboard?limit=50`);
+      const data = await res.json();
+      const rows = data.leaderboard || [];
+      list.innerHTML = rows.length ? rows.map((r,i)=>{
+        const medal = i===0?'🥇':i===1?'🥈':i===2?'🥉':`${i+1}.`;
+        return `<li><span>${medal} ${escapeHtml(r.username)}</span><span>${r.best_score}</span></li>`;
+      }).join('') : '<li>—</li>';
+    }catch(err){
+      list.innerHTML = `<li>${t().genericError}</li>`;
+    }
+  });
+  el('leaderCloseBtn').addEventListener('click', ()=>{ modalLayer.style.display='none'; });
+  function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  // ---------- Remove Ads (email flow) ----------
+  el('removeAdsBtn').addEventListener('click', ()=>{
+    const T = t();
+    el('premiumTitle').textContent = T.premiumTitle;
+    el('premiumText').textContent = state.username ? T.premiumTextLoggedIn(state.username) : T.premiumTextLoggedOut;
+    el('premiumEmailLine').textContent = CONFIG.SUPPORT_EMAIL;
+    el('premiumEmailBtn').textContent = T.emailBtn;
+    el('premiumEmailBtn').style.display = state.username ? 'inline-block' : 'none';
+    el('premiumCloseBtn').textContent = T.close;
+    premiumCard.style.display='block'; authCard.style.display='none'; leaderCard.style.display='none';
+    modalLayer.style.display='flex';
+  });
+  el('premiumEmailBtn').addEventListener('click', ()=>{
+    const subject = encodeURIComponent('Sprout Connect Premium — Remove Ads');
+    const body = encodeURIComponent(`Hi!\n\nI'd like to remove ads on my Sprout Connect account.\nMy username: ${state.username}\n\nThanks!`);
+    window.location.href = `mailto:${CONFIG.SUPPORT_EMAIL}?subject=${subject}&body=${body}`;
+  });
+  el('premiumCloseBtn').addEventListener('click', ()=>{ modalLayer.style.display='none'; });
+
+  // ---------- gating ----------
+  function lockGame(){
+    el('hud').style.display = 'none';
+    boardWrap.style.display = 'none';
+    el('footerNote').style.display = 'none';
+    state.gameStarted = false;
+    clearInterval(state.timerId);
+  }
+  function startGame(){
+    el('hud').style.display = 'flex';
+    boardWrap.style.display = 'block';
+    el('footerNote').style.display = 'block';
+    state.gameStarted = true;
+    state.timer = timerForLevel(state.level);
+    timeVal.textContent = state.timer;
+    buildLevel(state.level);
+    render();
+    startTimer();
+  }
+
+  // ---------- Admin route (integrated, password-gated, separate from player accounts) ----------
+  const isAdminRoute = new URLSearchParams(window.location.search).get('admin') === '1';
+  let adminUsers = [];
+
+  function escapeHtmlAdmin(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function fmtDateAdmin(ms){ if(!ms) return '—'; const d=new Date(Number(ms)); return d.toLocaleDateString()+' '+d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+
+  async function tryAdminKey(key){
+    try{
+      const res = await fetch(`${CONFIG.API_BASE_URL}/api/admin/users?key=${encodeURIComponent(key)}`);
+      if(!res.ok) return null;
+      const data = await res.json();
+      return data.users || [];
+    }catch(err){ return null; }
+  }
+
+  function renderAdminTable(users){
+    const tbody = el('adminTbody');
+    tbody.innerHTML = users.map(u => `
+      <tr style="border-bottom:1px solid #d8bd8c;">
+        <td style="padding:8px 10px; font-family:monospace;">${u.id}</td>
+        <td style="padding:8px 10px;">${escapeHtmlAdmin(u.username)}</td>
+        <td style="padding:8px 10px; font-family:monospace;">${escapeHtmlAdmin(u.signup_ip || '—')}</td>
+        <td style="padding:8px 10px;">${fmtDateAdmin(u.created_at)}</td>
+        <td style="padding:8px 10px;">${u.best_score ?? 0}</td>
+        <td style="padding:8px 10px;">${u.is_premium ? '<span style="background:var(--sun); color:#5b3a00; padding:2px 8px; border-radius:8px; font-weight:700; font-size:0.9em;">✨ Premium</span>' : 'Free'}</td>
+        <td style="padding:8px 10px;">${u.is_premium ? '<button class="btn ghost" disabled>Granted</button>' : `<button class="btn alt grantBtnAdmin" data-id="${u.id}">Grant Premium</button>`}</td>
+      </tr>
+    `).join('');
+    tbody.querySelectorAll('.grantBtnAdmin').forEach(btn=>{
+      btn.addEventListener('click', ()=> grantPremiumAdmin(btn.dataset.id, btn));
+    });
+  }
+
+  async function grantPremiumAdmin(id, btn){
+    const key = localStorage.getItem('sc_admin_key');
+    btn.disabled = true; btn.textContent = '...';
+    try{
+      const res = await fetch(`${CONFIG.API_BASE_URL}/api/admin/grant-premium?id=${encodeURIComponent(id)}&key=${encodeURIComponent(key)}`);
+      const data = await res.json();
+      if(res.ok){
+        const u = adminUsers.find(x=>String(x.id)===String(id));
+        if(u) u.is_premium = 1;
+        renderAdminTable(applyAdminFilter());
+        el('adminStatus').textContent = `✅ Premium granted to "${data.username}" (ID ${data.id}).`;
+      } else {
+        el('adminStatus').textContent = `❌ ${data.error || 'Grant failed.'}`;
+        btn.disabled = false; btn.textContent = 'Grant Premium';
+      }
+    }catch(err){
+      el('adminStatus').textContent = `❌ ${err.message}`;
+      btn.disabled = false; btn.textContent = 'Grant Premium';
+    }
+  }
+
+  function applyAdminFilter(){
+    const q = el('adminSearch').value.trim().toLowerCase();
+    if(!q) return adminUsers;
+    return adminUsers.filter(u => String(u.id).includes(q) || (u.username||'').toLowerCase().includes(q));
+  }
+
+  function showAdminPanel(){
+    el('adminGate').style.display = 'none';
+    el('adminPanel').style.display = 'block';
+    renderAdminTable(adminUsers);
+  }
+
+  async function bootAdminRoute(){
+    document.getElementById('pageWrap').style.display = 'none';
+    const savedKey = localStorage.getItem('sc_admin_key');
+    if(savedKey){
+      const users = await tryAdminKey(savedKey);
+      if(users){ adminUsers = users; showAdminPanel(); return; }
+      localStorage.removeItem('sc_admin_key');
+    }
+    el('adminGate').style.display = 'block';
+  }
+
+  el('adminGateSubmit').addEventListener('click', async ()=>{
+    const key = el('adminPasswordInput').value.trim();
+    el('adminGateError').textContent = '';
+    if(!key) return;
+    el('adminGateSubmit').disabled = true;
+    const users = await tryAdminKey(key);
+    el('adminGateSubmit').disabled = false;
+    if(users){
+      localStorage.setItem('sc_admin_key', key);
+      adminUsers = users;
+      showAdminPanel();
+    } else {
+      el('adminGateError').textContent = 'Wrong password, or the API is unreachable.';
+    }
+  });
+  el('adminPasswordInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') el('adminGateSubmit').click(); });
+  el('adminSearch').addEventListener('input', ()=> renderAdminTable(applyAdminFilter()));
+  el('adminLogoutBtn').addEventListener('click', ()=>{
+    localStorage.removeItem('sc_admin_key');
+    el('adminPanel').style.display = 'none';
+    el('adminPasswordInput').value = '';
+    el('adminGate').style.display = 'block';
+  });
+
+  // ---------- init ----------
+  if(isAdminRoute){
+    bootAdminRoute();
+  } else {
+    applyStaticText();
+    lockGame();
+    (async ()=>{
+      if(state.token){
+        const stillValid = await refreshPremiumStatus();
+        if(stillValid){
+          startGame();
+          return;
+        }
+      }
+      openAuthModal(true);
+    })();
+  }
+})();
+</script>
+</body>
+</html>
